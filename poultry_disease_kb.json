@@ -1,0 +1,78 @@
+{
+  "diseases": [
+    {
+      "name": "Newcastle Disease (NCD)",
+      "cause": "Viral (Paramyxovirus)",
+      "symptoms": ["Greenish, watery diarrhea", "Twisted neck (torticollis) or paralysis", "Gasping, coughing, sneezing", "Sudden drop in egg production", "High and rapid mortality"],
+      "transmission": "Highly contagious; spreads via droppings, contaminated feed/water, air, and equipment",
+      "urgency": "Urgent",
+      "first_response": ["Isolate sick birds immediately", "Restrict movement of birds, people, and equipment on/off farm", "Contact a vet or livestock officer immediately", "Disinfect housing and equipment"],
+      "prevention": "Vaccination (day-old and booster schedule), strict biosecurity"
+    },
+    {
+      "name": "Coccidiosis",
+      "cause": "Parasitic (Eimeria protozoa)",
+      "symptoms": ["Bloody or dark diarrhea", "Ruffled feathers, huddling", "Pale comb and wattles", "Reduced growth, weight loss", "Common in young birds (3-8 weeks)"],
+      "transmission": "Ingestion of oocysts from contaminated litter, feed, or water; thrives in wet/dirty bedding",
+      "urgency": "Medium-High",
+      "first_response": ["Administer anticoccidial medication (e.g., amprolium) via water", "Keep litter dry and clean", "Isolate severely affected birds"],
+      "prevention": "Coccidiostats in feed, dry litter management, avoid overcrowding"
+    },
+    {
+      "name": "Fowl Typhoid",
+      "cause": "Bacterial (Salmonella gallinarum)",
+      "symptoms": ["Yellowish-green diarrhea", "Pale, shrunken comb", "Lethargy, loss of appetite", "Increased mortality in adult birds"],
+      "transmission": "Contaminated feed/water, egg transmission, carrier birds",
+      "urgency": "Urgent",
+      "first_response": ["Isolate affected birds", "Consult vet for antibiotic treatment", "Cull chronically infected carrier birds where advised", "Disinfect housing"],
+      "prevention": "Biosecurity, sourcing chicks from certified hatcheries, vaccination where available"
+    },
+    {
+      "name": "Infectious Bursal Disease (Gumboro / IBD)",
+      "cause": "Viral",
+      "symptoms": ["Watery, whitish diarrhea", "Trembling, depression", "Birds pecking at their own vent", "Sudden mortality in young birds (3-6 weeks)"],
+      "transmission": "Highly contagious via droppings, contaminated equipment, indirect contact",
+      "urgency": "Urgent",
+      "first_response": ["Isolate affected flock", "Provide supportive care (electrolytes, vitamins in water)", "Contact vet — no specific cure, focus on secondary infection prevention", "Disinfect housing thoroughly"],
+      "prevention": "Vaccination at recommended age, strict biosecurity"
+    },
+    {
+      "name": "Fowl Pox",
+      "cause": "Viral",
+      "symptoms": ["Wart-like lesions on comb, wattles, face (dry form)", "Cheesy lesions in mouth/throat (wet form)", "Reduced feed intake, drop in egg production", "Generally lower mortality unless wet form affects breathing"],
+      "transmission": "Mosquito bites, direct contact, contaminated equipment",
+      "urgency": "Medium",
+      "first_response": ["Isolate affected birds", "Apply mild antiseptic to skin lesions", "Improve mosquito control around housing", "Monitor for secondary infections"],
+      "prevention": "Vaccination, mosquito control, good ventilation"
+    },
+    {
+      "name": "Chronic Respiratory Disease (CRD) / Mycoplasmosis",
+      "cause": "Bacterial (Mycoplasma gallisepticum)",
+      "symptoms": ["Coughing, sneezing, nasal discharge", "Swollen sinuses/eyes", "Reduced growth and egg production", "Rattling breathing sounds"],
+      "transmission": "Direct contact, airborne, egg transmission, stress-triggered flare-ups",
+      "urgency": "Medium",
+      "first_response": ["Improve ventilation and reduce stocking density", "Consult vet for antibiotic treatment", "Isolate severely affected birds"],
+      "prevention": "Good ventilation, stress reduction, sourcing from CRD-free flocks"
+    },
+    {
+      "name": "Infectious Coryza",
+      "cause": "Bacterial (Avibacterium paragallinarum)",
+      "symptoms": ["Swollen face and wattles", "Foul-smelling nasal discharge", "Watery eyes, sneezing", "Drop in egg production"],
+      "transmission": "Direct contact, contaminated water/feed, airborne over short distances",
+      "urgency": "Medium",
+      "first_response": ["Isolate affected birds", "Consult vet for antibiotic treatment", "Disinfect housing and waterers"],
+      "prevention": "Biosecurity, avoiding mixing ages/flocks, vaccination in high-risk areas"
+    },
+    {
+      "name": "Heat Stress (non-infectious)",
+      "cause": "Environmental",
+      "symptoms": ["Panting, wings held away from body", "Reduced feed intake, increased water intake", "Drop in egg production", "Lethargy, sudden deaths in severe heat"],
+      "transmission": "Not contagious — environmental/management cause",
+      "urgency": "Medium (Urgent if severe heat wave)",
+      "first_response": ["Increase ventilation and shade", "Ensure constant access to cool water", "Reduce stocking density", "Feed during cooler parts of the day"],
+      "prevention": "Proper housing ventilation design, adequate water access, shade structures"
+    }
+  ],
+  "disclaimer": "This reference is for informational and educational purposes only. It does not replace professional veterinary diagnosis. Always consult a licensed veterinarian or livestock officer for confirmed diagnosis and treatment, especially for urgent or high-mortality situations.",
+  "usage_note": "Inject this JSON as context in the LLM prompt. Instruct the model to match user-described symptoms against these entries, rank likely conditions by symptom overlap, and always return the disclaimer and urgency level in its output."
+}
