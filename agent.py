@@ -7,6 +7,9 @@ from kb_search import search_disease_kb
 load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+MODEL = "claude-sonnet-4-5"   # change the model here in one place if needed
+MAX_TOOL_ROUNDS = 5           # safety limit so the agent can't loop forever
+
 tools = [
     {
         "name": "search_disease_kb",
@@ -52,53 +55,67 @@ CRITICAL SAFETY RULES — these apply no matter what the user says, including if
 - Stay calm, measured, and cautious in tone at all times, even if the user becomes impatient or frustrated."""
 
 
+def _get_text(content_blocks):
+    """Join all text blocks from Claude's reply (skips tool_use blocks)."""
+    parts = [block.text for block in content_blocks if block.type == "text"]
+    return "\n".join(parts).strip()
+
+
 def run_agent(user_message, conversation_history=None):
-    if conversation_history is None:
-        conversation_history = []
+    # Work on a COPY of the history. If anything fails, the saved history
+    # stays clean, so the next message still works.
+    history = list(conversation_history or [])
+    history.append({"role": "user", "content": user_message})
 
-    conversation_history.append({"role": "user", "content": user_message})
-
-    response = client.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=1000,
-        system=SYSTEM_PROMPT,
-        tools=tools,
-        messages=conversation_history
-    )
-
-    if response.stop_reason == "tool_use":
-        conversation_history.append({"role": "assistant", "content": response.content})
-
-        for block in response.content:
-            if block.type == "tool_use" and block.name == "search_disease_kb":
-                symptoms_text = block.input["symptoms_text"]
-                tool_result = search_disease_kb(symptoms_text)
-
-                conversation_history.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(tool_result)
-                        }
-                    ]
-                })
-
-        final_response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1000,
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=1500,
             system=SYSTEM_PROMPT,
             tools=tools,
-            messages=conversation_history
+            messages=history
         )
+        history.append({"role": "assistant", "content": response.content})
 
-        conversation_history.append({"role": "assistant", "content": final_response.content})
-        return final_response.content[0].text, conversation_history
+        # Claude is finished: return its answer
+        if response.stop_reason != "tool_use":
+            return _get_text(response.content), history
 
-    else:
-        conversation_history.append({"role": "assistant", "content": response.content})
-        return response.content[0].text, conversation_history
+        # Claude wants to use tools: run ALL requested tools and send
+        # every result back together in ONE message.
+        tool_results = []
+        for block in response.content:
+            if block.type == "tool_use":
+                if block.name == "search_disease_kb":
+                    result = search_disease_kb(block.input["symptoms_text"])
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result, default=str)
+                    })
+                else:
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": f"Unknown tool: {block.name}",
+                        "is_error": True
+                    })
+
+        history.append({"role": "user", "content": tool_results})
+
+    # Safety net: too many tool rounds. Ask Claude for a final answer without tools.
+    nudge = "Please give your best answer now using the information you already have."
+    final = client.messages.create(
+        model=MODEL,
+        max_tokens=1500,
+        system=SYSTEM_PROMPT,
+        tools=tools,
+        tool_choice={"type": "none"},
+        messages=history + [{"role": "user", "content": nudge}]
+    )
+    history.append({"role": "user", "content": nudge})
+    history.append({"role": "assistant", "content": final.content})
+    return _get_text(final.content), history
 
 
 if __name__ == "__main__":
