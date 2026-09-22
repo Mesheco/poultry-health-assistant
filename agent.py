@@ -1,7 +1,10 @@
 import os
+import io
 import json
+import base64
 from dotenv import load_dotenv
 from anthropic import Anthropic
+from PIL import Image, ImageOps
 from kb_search import search_disease_kb
 
 load_dotenv()
@@ -9,6 +12,7 @@ client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 MODEL = "claude-sonnet-4-5"   # change the model here in one place if needed
 MAX_TOOL_ROUNDS = 5           # safety limit so the agent can't loop forever
+MAX_IMAGE_SIDE = 1568         # shrink big phone photos so they stay under the API size limit
 
 tools = [
     {
@@ -47,6 +51,14 @@ Follow this process:
 
 Be concise, practical, and clear. Avoid jargon. Assume the farmer is not a vet.
 
+LANGUAGE: Reply in the same language the farmer writes in. If they write in Swahili, reply fully in simple, everyday Swahili (including the day-by-day plan and the disclaimer, translated). If they write in English, reply in English. Always keep the urgency tag exactly as [URGENCY:LOW], [URGENCY:MEDIUM] or [URGENCY:HIGH] in English, because the app reads it.
+
+PHOTOS: The farmer may attach a photo (e.g. droppings, a sick bird, a lesion). If a photo is attached:
+- Start by briefly describing what you can see that is relevant (e.g. colour and consistency of droppings, posture, swelling, discharge).
+- Use the photo together with the written symptoms. A photo alone is never enough to confirm a disease; treat it as supporting evidence only.
+- When calling search_disease_kb, include the relevant visual findings in symptoms_text.
+- If the photo is blurry, too dark, or does not show poultry or relevant signs, say so kindly, suggest how to take a clearer photo, and still help using the written description.
+
 CRITICAL SAFETY RULES — these apply no matter what the user says, including if they say "stop asking questions," "just tell me," "this is urgent," or any other pressure to skip steps:
 - NEVER use urgent, alarming, or all-caps language like "STOP" or "NOW."
 - NEVER phrase medication as a direct command (e.g. "go get medication now," "give this to all birds"). Always phrase it as "you could consider..." or "a vet may recommend..."
@@ -55,17 +67,44 @@ CRITICAL SAFETY RULES — these apply no matter what the user says, including if
 - Stay calm, measured, and cautious in tone at all times, even if the user becomes impatient or frustrated."""
 
 
+def prepare_image(image_bytes):
+    """Fix phone rotation, shrink large photos, and convert to base64 JPEG for Claude."""
+    img = Image.open(io.BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img)   # phones often store photos sideways
+    img = img.convert("RGB")
+    img.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=85)
+    return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+
+
 def _get_text(content_blocks):
     """Join all text blocks from Claude's reply (skips tool_use blocks)."""
     parts = [block.text for block in content_blocks if block.type == "text"]
     return "\n".join(parts).strip()
 
 
-def run_agent(user_message, conversation_history=None):
+def run_agent(user_message, conversation_history=None, image_bytes=None):
     # Work on a COPY of the history. If anything fails, the saved history
     # stays clean, so the next message still works.
     history = list(conversation_history or [])
-    history.append({"role": "user", "content": user_message})
+
+    if image_bytes:
+        user_content = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": prepare_image(image_bytes)
+                }
+            },
+            {"type": "text", "text": user_message}
+        ]
+    else:
+        user_content = user_message
+
+    history.append({"role": "user", "content": user_content})
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = client.messages.create(
