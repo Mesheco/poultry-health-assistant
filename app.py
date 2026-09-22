@@ -94,7 +94,8 @@ if user_input:
             else:
                 reply = run_research_agent(user_input)
         except Exception as e:
-            print("ERROR DETAILS:", e)
+            print("ERROR DETAILS:", repr(e), flush=True)
+            st.exception(e)  # TEMPORARY: shows the real error on screen. Remove before the hackathon.
             reply = "Sorry, something went wrong while processing your message. Please try again in a moment."
 
     render_message("assistant", reply)
