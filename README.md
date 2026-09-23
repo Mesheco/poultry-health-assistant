@@ -1,4 +1,6 @@
-# 🐔 AI Poultry Health Assistant
+   <p align="center"><img src="logo.png" width="140"></p>
+
+   # Mesheco Poultry AI Disease Detector
 
 **A multi-agent AI assistant that helps smallholder poultry farmers in Kenya catch disease early, understand what is making their birds sick, and know what to do next — in English or Swahili.**
 
