@@ -52,7 +52,7 @@ if "display_messages" not in st.session_state:
 if "mode" not in st.session_state:
     st.session_state.mode = "Diagnose"
 if "uploader_key" not in st.session_state:
-    st.session_state.uploader_key = 0   # changing this clears the photo uploader
+    st.session_state.uploader_key = 0   # changing this clears the photo uploader and camera
 if "flock_log" not in st.session_state:
     st.session_state.flock_log = []
 if "monitor_result" not in st.session_state:
@@ -79,17 +79,32 @@ with st.sidebar:
         ]
     )
 
-    # Photo upload — only in Diagnose mode
+    # Photo — only in Diagnose mode: upload an existing photo OR take one with the camera
     if st.session_state.mode == "Diagnose":
         st.divider()
         st.subheader("📷 Add a photo (optional)")
-        uploaded_photo = st.file_uploader(
-            "Photo of droppings, a sick bird, or a lesion",
-            type=["jpg", "jpeg", "png", "webp"],
-            key=f"photo_{st.session_state.uploader_key}"
+        photo_method = st.radio(
+            "How would you like to add a photo?",
+            ["Upload a photo", "Take a photo"],
+            horizontal=True,
+            key="photo_method"
         )
-        if uploaded_photo is not None:
-            st.image(uploaded_photo, caption="Will be sent with your next message")
+
+        if photo_method == "Upload a photo":
+            uploaded_photo = st.file_uploader(
+                "Photo of droppings, a sick bird, or a lesion",
+                type=["jpg", "jpeg", "png", "webp"],
+                key=f"photo_{st.session_state.uploader_key}"
+            )
+            if uploaded_photo is not None:
+                st.image(uploaded_photo, caption="Will be sent with your next message")
+        else:
+            uploaded_photo = st.camera_input(
+                "Point the camera at the bird or droppings, then click Take Photo",
+                key=f"camera_{st.session_state.uploader_key}"
+            )
+            if uploaded_photo is not None:
+                st.caption("✅ Photo ready. It will be sent with your next message.")
 
 
 def extract_urgency(text):
@@ -293,7 +308,7 @@ if user_input:
     render_message("assistant", reply)
     st.session_state.display_messages.append({"role": "assistant", "content": reply})
 
-    # Clear the photo uploader after a successful send
+    # Clear the photo (upload or camera) after a successful send
     if image_bytes and not had_error:
         st.session_state.uploader_key += 1
         st.rerun()
