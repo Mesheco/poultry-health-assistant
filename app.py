@@ -7,7 +7,11 @@ from agent import run_agent
 from research_agent import run_research_agent
 from monitor_agent import run_monitor_agent
 
-st.set_page_config(page_title="Poultry Health Assistant", page_icon="🐔")
+APP_NAME = "Mesheco Poultry AI Disease Detector"
+LOGO = "logo.png"
+
+st.set_page_config(page_title=APP_NAME, page_icon=LOGO)
+st.logo(LOGO)
 
 # Simple password gate — works both locally (.env) and on Streamlit Cloud (Secrets)
 try:
@@ -19,7 +23,9 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔒 Poultry Health Assistant - Login")
+    st.image(LOGO, width=120)
+    st.title(APP_NAME)
+    st.caption("🔒 Please log in to continue")
     entered_password = st.text_input("Enter password", type="password")
     if st.button("Login"):
         if entered_password == correct_password:
@@ -29,7 +35,11 @@ if not st.session_state.authenticated:
             st.error("Incorrect password")
     st.stop()
 
-st.title("🐔 Poultry Health Assistant")
+logo_col, title_col = st.columns([1, 6], vertical_alignment="center")
+with logo_col:
+    st.image(LOGO, width=80)
+with title_col:
+    st.title(APP_NAME)
 st.caption("Describe your birds' symptoms and get guidance on likely causes and next steps.")
 
 LOG_COLUMNS = ["date", "total_birds", "deaths", "eggs", "feed_kg", "water_litres", "symptoms"]
