@@ -3,9 +3,10 @@ import os
 import re
 import pandas as pd
 from datetime import date, timedelta
+from urllib.parse import quote
 from agent import run_agent
 from research_agent import run_research_agent
-from monitor_agent import run_monitor_agent
+from monitor_agent import run_monitor_agent, calculate_key_facts
 
 APP_NAME = "Mesheco Poultry AI Disease Detector"
 LOGO = "logo.png"
@@ -49,14 +50,23 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "display_messages" not in st.session_state:
     st.session_state.display_messages = []
-if "mode" not in st.session_state:
-    st.session_state.mode = "Diagnose"
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0   # changing this clears the photo uploader and camera
 if "flock_log" not in st.session_state:
     st.session_state.flock_log = []
 if "monitor_result" not in st.session_state:
     st.session_state.monitor_result = None
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None   # a message waiting to be sent to Diagnose (from Monitor)
+
+
+def start_diagnosis_from_log(message):
+    """Called when the farmer clicks the handoff button in Monitor mode."""
+    st.session_state.mode_radio = "Diagnose"      # switch the sidebar to Diagnose
+    st.session_state.pending_prompt = message     # send this message automatically
+    st.session_state.history = []                 # start a fresh diagnosis conversation
+    st.session_state.display_messages = []
+
 
 uploaded_photo = None
 
@@ -76,7 +86,8 @@ with st.sidebar:
             "Describe symptoms for a diagnosis",
             "Check for current outbreak news",
             "Log daily checks and spot early warnings"
-        ]
+        ],
+        key="mode_radio"
     )
 
     # Photo — only in Diagnose mode: upload an existing photo OR take one with the camera
@@ -116,7 +127,30 @@ def extract_urgency(text):
     return None, text
 
 
-def render_message(role, text, image=None):
+def to_whatsapp_format(text):
+    """Convert the app's Markdown into WhatsApp's simpler formatting."""
+    text = re.sub(r"^\s*-{3,}\s*$", "", text, flags=re.M)           # remove --- divider lines
+    text = re.sub(r"^\s*[-*]\s+", "• ", text, flags=re.M)           # bullet points -> •
+    text = re.sub(r"\*\*(.+?)\*\*", r"*\1*", text)                  # **bold** -> *bold*
+    text = re.sub(r"^#{1,6}\s*(.+)$", r"*\1*", text, flags=re.M)    # ## Heading -> *Heading*
+    text = re.sub(r"\*{2,}", "*", text)                             # tidy any leftover stars
+    text = re.sub(r"\n{3,}", "\n\n", text)                          # remove extra blank lines
+    return text
+
+
+def whatsapp_link(text):
+    """Build a link that opens WhatsApp with the reply ready to send."""
+    urgency, cleaned_text = extract_urgency(text)
+    header = "Mesheco Poultry AI"
+    if urgency:
+        header += f" (Urgency: {urgency})"
+    body = f"*{header}*\n\n{to_whatsapp_format(cleaned_text)}"
+    if len(body) > 1800:   # keep the link a safe length for WhatsApp
+        body = body[:1800] + "…"
+    return "https://wa.me/?text=" + quote(body)
+
+
+def render_message(role, text, image=None, share=False):
     urgency, cleaned_text = extract_urgency(text)
 
     with st.chat_message(role):
@@ -131,6 +165,9 @@ def render_message(role, text, image=None):
             st.success("🟢 Urgency: LOW")
 
         st.markdown(cleaned_text)
+
+        if share:
+            st.markdown(f"[📤 Share on WhatsApp]({whatsapp_link(text)})")
 
 
 # ---------------- MONITOR MODE ----------------
@@ -158,6 +195,19 @@ def sample_log():
         })
         birds -= deaths[i]
     return rows
+
+
+def build_handoff_message(df):
+    """Turn the flock log into a message for the Diagnose agent."""
+    facts = calculate_key_facts(df.to_csv(index=False))
+    notes = [f"{r['date']}: {r['symptoms']}" for r in st.session_state.flock_log
+             if str(r.get("symptoms", "")).strip()]
+    notes_text = "\n".join("- " + n for n in notes) if notes else "- No symptoms were written in the log"
+    return (
+        "My flock monitoring log is showing warning signs. Please help me work out what might be wrong.\n\n"
+        f"Key facts from my log:\n{facts}\n\n"
+        f"Symptoms I noted:\n{notes_text}"
+    )
 
 
 def show_monitor_page():
@@ -266,7 +316,18 @@ def show_monitor_page():
                 st.session_state.monitor_result = "Sorry, something went wrong while checking your flock. Please try again in a moment."
 
     if st.session_state.monitor_result:
-        render_message("assistant", st.session_state.monitor_result)
+        render_message("assistant", st.session_state.monitor_result, share=True)
+
+        # Handoff: if the Monitor found warning signs, offer a one-click diagnosis
+        urgency, _ = extract_urgency(st.session_state.monitor_result)
+        if urgency in ("MEDIUM", "HIGH"):
+            st.info("The Monitor found warning signs. The Diagnose agent can help work out possible causes.")
+            st.button(
+                "🩺 Get a diagnosis for these warning signs",
+                type="primary",
+                on_click=start_diagnosis_from_log,
+                args=(build_handoff_message(df),)
+            )
 
 
 if st.session_state.mode == "Monitor":
@@ -277,10 +338,16 @@ if st.session_state.mode == "Monitor":
 # ---------------- DIAGNOSE & RESEARCH MODES ----------------
 
 for msg in st.session_state.display_messages:
-    render_message(msg["role"], msg["content"], msg.get("image"))
+    is_shareable = msg["role"] == "assistant" and not msg.get("error")
+    render_message(msg["role"], msg["content"], msg.get("image"), share=is_shareable)
 
 placeholder_text = "Describe your birds' symptoms..." if st.session_state.mode == "Diagnose" else "Ask about current outbreaks or poultry news..."
 user_input = st.chat_input(placeholder_text)
+
+# A message handed over from the Monitor agent is sent automatically
+if not user_input and st.session_state.mode == "Diagnose" and st.session_state.pending_prompt:
+    user_input = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
 
 if user_input:
     image_bytes = None
@@ -305,8 +372,8 @@ if user_input:
             st.exception(e)  # TEMPORARY: shows the real error on screen. Remove before the hackathon.
             reply = "Sorry, something went wrong while processing your message. Please try again in a moment."
 
-    render_message("assistant", reply)
-    st.session_state.display_messages.append({"role": "assistant", "content": reply})
+    render_message("assistant", reply, share=not had_error)
+    st.session_state.display_messages.append({"role": "assistant", "content": reply, "error": had_error})
 
     # Clear the photo (upload or camera) after a successful send
     if image_bytes and not had_error:
