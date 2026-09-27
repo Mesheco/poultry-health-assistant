@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import re
+import json
 import pandas as pd
 from datetime import date, timedelta
 from urllib.parse import quote
@@ -10,6 +11,7 @@ from monitor_agent import run_monitor_agent, calculate_key_facts
 
 APP_NAME = "Mesheco Poultry AI Disease Detector"
 LOGO = "logo.png"
+CONTACTS_FILE = "vet_contacts.json"
 
 st.set_page_config(page_title=APP_NAME, page_icon=LOGO)
 st.logo(LOGO)
@@ -58,6 +60,23 @@ if "monitor_result" not in st.session_state:
     st.session_state.monitor_result = None
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None   # a message waiting to be sent to Diagnose (from Monitor)
+
+
+def load_contacts():
+    """Read the verified vet / agrovet / county office contacts from vet_contacts.json."""
+    try:
+        with open(CONTACTS_FILE, encoding="utf-8") as f:
+            return json.load(f).get("contacts", [])
+    except Exception:
+        return []
+
+
+def phone_link(phone):
+    """Turn '0717 138 312' into a tap-to-call link: tel:+254717138312."""
+    digits = re.sub(r"[^\d+]", "", phone)
+    if digits.startswith("0"):
+        digits = "+254" + digits[1:]
+    return f"tel:{digits}"
 
 
 def start_diagnosis_from_log(message):
@@ -117,6 +136,24 @@ with st.sidebar:
             if uploaded_photo is not None:
                 st.caption("✅ Photo ready. It will be sent with your next message.")
 
+    # Verified local contacts — shown in every mode
+    st.divider()
+    st.subheader("📞 Find help near you")
+    contacts = load_contacts()
+    counties = sorted({c["county"] for c in contacts})
+    if counties:
+        county = st.selectbox("Your county", counties, key="help_county")
+        for c in contacts:
+            if c["county"] == county:
+                st.markdown(
+                    f"**{c['name']}**  \n"
+                    f"{c['type']} · {c['location']}  \n"
+                    f"[📞 {c['phone']}]({phone_link(c['phone'])})"
+                )
+        st.caption("More counties coming soon. You can also contact your county veterinary office.")
+    else:
+        st.caption("Local contacts coming soon. Please contact your county veterinary office.")
+
 
 def extract_urgency(text):
     match = re.search(r"\[URGENCY:(LOW|MEDIUM|HIGH)\]", text)
@@ -165,6 +202,9 @@ def render_message(role, text, image=None, share=False):
             st.success("🟢 Urgency: LOW")
 
         st.markdown(cleaned_text)
+
+        if role == "assistant" and urgency in ("MEDIUM", "HIGH"):
+            st.info("📞 Need a vet? See **Find help near you** in the sidebar for local contacts.")
 
         if share:
             st.markdown(f"[📤 Share on WhatsApp]({whatsapp_link(text)})")
