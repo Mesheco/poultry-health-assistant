@@ -3,73 +3,179 @@
     {
       "name": "Newcastle Disease (NCD)",
       "cause": "Viral (Paramyxovirus)",
-      "symptoms": ["Greenish, watery diarrhea", "Twisted neck (torticollis) or paralysis", "Gasping, coughing, sneezing", "Sudden drop in egg production", "High and rapid mortality"],
+      "symptoms": [
+        "Greenish, watery diarrhea",
+        "Twisted neck (torticollis) or paralysis",
+        "Gasping, coughing, sneezing",
+        "Sudden drop in egg production",
+        "High and rapid mortality"
+      ],
       "transmission": "Highly contagious; spreads via droppings, contaminated feed/water, air, and equipment",
       "urgency": "Urgent",
-      "first_response": ["Isolate sick birds immediately", "Restrict movement of birds, people, and equipment on/off farm", "Contact a vet or livestock officer immediately", "Disinfect housing and equipment"],
-      "prevention": "Vaccination (day-old and booster schedule), strict biosecurity"
+      "first_response": [
+        "Isolate sick birds immediately",
+        "Restrict movement of birds, people, and equipment on/off farm",
+        "Contact a vet or livestock officer immediately",
+        "Disinfect housing and equipment"
+      ],
+      "prevention": "Vaccination (day-old and booster schedule), strict biosecurity",
+      "note": "Notifiable disease in Kenya. Signs overlap strongly with Avian Influenza (bird flu); only laboratory tests can tell them apart."
+    },
+    {
+      "name": "Avian Influenza (Bird Flu)",
+      "cause": "Viral (Influenza A virus, e.g. highly pathogenic H5 strains)",
+      "symptoms": [
+        "Sudden, very high mortality, sometimes with few signs beforehand",
+        "Swollen head, face, comb and wattles",
+        "Bluish or purple comb, wattles and legs",
+        "Breathing difficulty, gasping, coughing, sneezing, nasal discharge",
+        "Sharp drop in egg production, soft-shelled or misshapen eggs",
+        "Nervous signs: twisted neck, trembling, loss of balance",
+        "Greenish or watery diarrhea",
+        "Severe dullness, not eating or drinking"
+      ],
+      "transmission": "Highly contagious; spread by wild birds (especially water birds), droppings, contaminated equipment, vehicles, feed bags, people's clothes and shoes, and movement of infected birds. Can infect people through close contact with sick or dead birds.",
+      "urgency": "Urgent (notifiable disease; can infect people)",
+      "first_response": [
+        "Do not handle sick or dead birds with bare hands; use gloves or a plastic bag over the hand and wash hands with soap afterwards",
+        "Keep children and other people away from the birds",
+        "Do not move, sell or eat birds or eggs from the flock",
+        "Report immediately to the county veterinary office or livestock officer",
+        "If any person develops fever, cough, sore eyes or breathing difficulty after contact, seek medical care and tell the health worker about the poultry contact and possible bird flu",
+        "Follow official instructions on testing, disposal of dead birds and disinfection"
+      ],
+      "prevention": "Strict biosecurity, keep poultry away from wild birds and the water they use, control visitors and vehicles, footbaths at the entrance, report unusual deaths early",
+      "note": "Notifiable disease in Kenya and a human health risk. Signs overlap strongly with Newcastle Disease; only laboratory tests can tell them apart."
     },
     {
       "name": "Coccidiosis",
       "cause": "Parasitic (Eimeria protozoa)",
-      "symptoms": ["Bloody or dark diarrhea", "Ruffled feathers, huddling", "Pale comb and wattles", "Reduced growth, weight loss", "Common in young birds (3-8 weeks)"],
+      "symptoms": [
+        "Bloody or dark diarrhea",
+        "Ruffled feathers, huddling",
+        "Pale comb and wattles",
+        "Reduced growth, weight loss",
+        "Common in young birds (3-8 weeks)"
+      ],
       "transmission": "Ingestion of oocysts from contaminated litter, feed, or water; thrives in wet/dirty bedding",
       "urgency": "Medium-High",
-      "first_response": ["Administer anticoccidial medication (e.g., amprolium) via water", "Keep litter dry and clean", "Isolate severely affected birds"],
+      "first_response": [
+        "Keep litter dry and clean; remove wet bedding",
+        "Isolate severely affected birds",
+        "Contact a vet, livestock officer or registered agrovet; an anticoccidial treatment may be recommended — follow the product label exactly and observe the withdrawal period for eggs and meat"
+      ],
       "prevention": "Coccidiostats in feed, dry litter management, avoid overcrowding"
     },
     {
       "name": "Fowl Typhoid",
       "cause": "Bacterial (Salmonella gallinarum)",
-      "symptoms": ["Yellowish-green diarrhea", "Pale, shrunken comb", "Lethargy, loss of appetite", "Increased mortality in adult birds"],
+      "symptoms": [
+        "Yellowish-green diarrhea",
+        "Pale, shrunken comb",
+        "Lethargy, loss of appetite",
+        "Increased mortality in adult birds"
+      ],
       "transmission": "Contaminated feed/water, egg transmission, carrier birds",
       "urgency": "Urgent",
-      "first_response": ["Isolate affected birds", "Consult vet for antibiotic treatment", "Cull chronically infected carrier birds where advised", "Disinfect housing"],
+      "first_response": [
+        "Isolate affected birds",
+        "Consult vet for antibiotic treatment",
+        "Cull chronically infected carrier birds where advised",
+        "Disinfect housing"
+      ],
       "prevention": "Biosecurity, sourcing chicks from certified hatcheries, vaccination where available"
     },
     {
       "name": "Infectious Bursal Disease (Gumboro / IBD)",
       "cause": "Viral",
-      "symptoms": ["Watery, whitish diarrhea", "Trembling, depression", "Birds pecking at their own vent", "Sudden mortality in young birds (3-6 weeks)"],
+      "symptoms": [
+        "Watery, whitish diarrhea",
+        "Trembling, depression",
+        "Birds pecking at their own vent",
+        "Sudden mortality in young birds (3-6 weeks)"
+      ],
       "transmission": "Highly contagious via droppings, contaminated equipment, indirect contact",
       "urgency": "Urgent",
-      "first_response": ["Isolate affected flock", "Provide supportive care (electrolytes, vitamins in water)", "Contact vet — no specific cure, focus on secondary infection prevention", "Disinfect housing thoroughly"],
+      "first_response": [
+        "Isolate affected flock",
+        "Provide supportive care (electrolytes, vitamins in water)",
+        "Contact vet — no specific cure, focus on secondary infection prevention",
+        "Disinfect housing thoroughly"
+      ],
       "prevention": "Vaccination at recommended age, strict biosecurity"
     },
     {
       "name": "Fowl Pox",
       "cause": "Viral",
-      "symptoms": ["Wart-like lesions on comb, wattles, face (dry form)", "Cheesy lesions in mouth/throat (wet form)", "Reduced feed intake, drop in egg production", "Generally lower mortality unless wet form affects breathing"],
+      "symptoms": [
+        "Wart-like lesions on comb, wattles, face (dry form)",
+        "Cheesy lesions in mouth/throat (wet form)",
+        "Reduced feed intake, drop in egg production",
+        "Generally lower mortality unless wet form affects breathing"
+      ],
       "transmission": "Mosquito bites, direct contact, contaminated equipment",
       "urgency": "Medium",
-      "first_response": ["Isolate affected birds", "Apply mild antiseptic to skin lesions", "Improve mosquito control around housing", "Monitor for secondary infections"],
+      "first_response": [
+        "Isolate affected birds",
+        "Apply mild antiseptic to skin lesions",
+        "Improve mosquito control around housing",
+        "Monitor for secondary infections"
+      ],
       "prevention": "Vaccination, mosquito control, good ventilation"
     },
     {
       "name": "Chronic Respiratory Disease (CRD) / Mycoplasmosis",
       "cause": "Bacterial (Mycoplasma gallisepticum)",
-      "symptoms": ["Coughing, sneezing, nasal discharge", "Swollen sinuses/eyes", "Reduced growth and egg production", "Rattling breathing sounds"],
+      "symptoms": [
+        "Coughing, sneezing, nasal discharge",
+        "Swollen sinuses/eyes",
+        "Reduced growth and egg production",
+        "Rattling breathing sounds"
+      ],
       "transmission": "Direct contact, airborne, egg transmission, stress-triggered flare-ups",
       "urgency": "Medium",
-      "first_response": ["Improve ventilation and reduce stocking density", "Consult vet for antibiotic treatment", "Isolate severely affected birds"],
+      "first_response": [
+        "Improve ventilation and reduce stocking density",
+        "Consult vet for antibiotic treatment",
+        "Isolate severely affected birds"
+      ],
       "prevention": "Good ventilation, stress reduction, sourcing from CRD-free flocks"
     },
     {
       "name": "Infectious Coryza",
       "cause": "Bacterial (Avibacterium paragallinarum)",
-      "symptoms": ["Swollen face and wattles", "Foul-smelling nasal discharge", "Watery eyes, sneezing", "Drop in egg production"],
+      "symptoms": [
+        "Swollen face and wattles",
+        "Foul-smelling nasal discharge",
+        "Watery eyes, sneezing",
+        "Drop in egg production"
+      ],
       "transmission": "Direct contact, contaminated water/feed, airborne over short distances",
       "urgency": "Medium",
-      "first_response": ["Isolate affected birds", "Consult vet for antibiotic treatment", "Disinfect housing and waterers"],
+      "first_response": [
+        "Isolate affected birds",
+        "Consult vet for antibiotic treatment",
+        "Disinfect housing and waterers"
+      ],
       "prevention": "Biosecurity, avoiding mixing ages/flocks, vaccination in high-risk areas"
     },
     {
       "name": "Heat Stress (non-infectious)",
       "cause": "Environmental",
-      "symptoms": ["Panting, wings held away from body", "Reduced feed intake, increased water intake", "Drop in egg production", "Lethargy, sudden deaths in severe heat"],
+      "symptoms": [
+        "Panting, wings held away from body",
+        "Reduced feed intake, increased water intake",
+        "Drop in egg production",
+        "Lethargy, sudden deaths in severe heat"
+      ],
       "transmission": "Not contagious — environmental/management cause",
       "urgency": "Medium (Urgent if severe heat wave)",
-      "first_response": ["Increase ventilation and shade", "Ensure constant access to cool water", "Reduce stocking density", "Feed during cooler parts of the day"],
+      "first_response": [
+        "Increase ventilation and shade",
+        "Ensure constant access to cool water",
+        "Reduce stocking density",
+        "Feed during cooler parts of the day"
+      ],
       "prevention": "Proper housing ventilation design, adequate water access, shade structures"
     }
   ],
