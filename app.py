@@ -8,10 +8,14 @@ from urllib.parse import quote
 from agent import run_agent
 from research_agent import run_research_agent
 from monitor_agent import run_monitor_agent, calculate_key_facts
+from streamlit_js_eval import get_geolocation
+from nearby_help import (find_nearby_help, geocode_place, call_link,
+                         whatsapp_link as whatsapp_chat_link,
+                         directions_link, delivery_message)
 
 APP_NAME = "Mesheco Poultry AI Disease Detector"
 LOGO = "logo.png"
-CONTACTS_FILE = "vet_contacts.json"
+FIND_HELP = "Find help near you"
 
 st.set_page_config(page_title=APP_NAME, page_icon=LOGO)
 st.logo(LOGO)
@@ -60,23 +64,51 @@ if "monitor_result" not in st.session_state:
     st.session_state.monitor_result = None
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None   # a message waiting to be sent to Diagnose (from Monitor)
+if "location" not in st.session_state:
+    st.session_state.location = None         # {"lat", "lon", "label"} once the farmer shares it
+if "gps_request" not in st.session_state:
+    st.session_state.gps_request = 0         # counts "use my location" clicks (0 = not asked)
+if "delivery_items" not in st.session_state:
+    st.session_state.delivery_items = ""
 
 
-def load_contacts():
-    """Read the verified vet / agrovet / county office contacts from vet_contacts.json."""
+def apply_link_from_agrinexus():
+    """
+    AgriNexus (and any other app) can open Mesheco on the right page with a link like:
+      ...streamlit.app/?mode=diagnose&q=my birds are sneezing&lat=-1.01&lon=36.90&from=agrinexus
+    mode: diagnose | research | monitor | find-help
+    q:    a question to send to the Diagnose agent straight away
+    lat/lon: the farmer's location, so Find help and the Diagnose agent know where they are
+    This runs once per visit.
+    """
+    if st.session_state.get("link_applied"):
+        return
+    st.session_state.link_applied = True
+    params = st.query_params
+    modes = {"diagnose": "Diagnose", "research": "Research", "monitor": "Monitor",
+             "find-help": FIND_HELP, "findhelp": FIND_HELP, "nearby": FIND_HELP}
+    mode = modes.get(params.get("mode", "").lower())
+    if mode:
+        st.session_state.mode_radio = mode
     try:
-        with open(CONTACTS_FILE, encoding="utf-8") as f:
-            return json.load(f).get("contacts", [])
-    except Exception:
-        return []
+        lat, lon = float(params["lat"]), float(params["lon"])
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            source = "AgriNexus" if params.get("from", "").lower() == "agrinexus" else "your link"
+            st.session_state.location = {"lat": lat, "lon": lon, "label": f"Location shared from {source}"}
+    except (KeyError, ValueError):
+        pass
+    question = params.get("q", "").strip()[:1000]
+    if question and mode in (None, "Diagnose"):
+        st.session_state.mode_radio = "Diagnose"
+        st.session_state.pending_prompt = question
 
 
-def phone_link(phone):
-    """Turn '0717 138 312' into a tap-to-call link: tel:+254717138312."""
-    digits = re.sub(r"[^\d+]", "", phone)
-    if digits.startswith("0"):
-        digits = "+254" + digits[1:]
-    return f"tel:{digits}"
+apply_link_from_agrinexus()
+
+
+def go_to_find_help():
+    """Switch the sidebar to the Find help page."""
+    st.session_state.mode_radio = FIND_HELP
 
 
 def start_diagnosis_from_log(message):
@@ -100,11 +132,12 @@ with st.sidebar:
     st.subheader("Mode")
     st.session_state.mode = st.radio(
         "Choose what you need:",
-        ["Diagnose", "Research", "Monitor"],
+        ["Diagnose", "Research", "Monitor", FIND_HELP],
         captions=[
             "Describe symptoms for a diagnosis",
             "Check for current outbreak news",
-            "Log daily checks and spot early warnings"
+            "Log daily checks and spot early warnings",
+            "Agrovets, vets and boda delivery near you"
         ],
         key="mode_radio"
     )
@@ -136,23 +169,14 @@ with st.sidebar:
             if uploaded_photo is not None:
                 st.caption("✅ Photo ready. It will be sent with your next message.")
 
-    # Verified local contacts — shown in every mode
+    # Location status — shown in every mode
     st.divider()
-    st.subheader("📞 Find help near you")
-    contacts = load_contacts()
-    counties = sorted({c["county"] for c in contacts})
-    if counties:
-        county = st.selectbox("Your county", counties, key="help_county")
-        for c in contacts:
-            if c["county"] == county:
-                st.markdown(
-                    f"**{c['name']}**  \n"
-                    f"{c['type']} · {c['location']}  \n"
-                    f"[📞 {c['phone']}]({phone_link(c['phone'])})"
-                )
-        st.caption("More counties coming soon. You can also contact your county veterinary office.")
+    if st.session_state.location:
+        st.caption(f"📍 Your location: **{st.session_state.location['label']}**")
     else:
-        st.caption("Local contacts coming soon. Please contact your county veterinary office.")
+        st.caption("📍 Location not shared yet. Share it to see agrovets, vets and boda riders near you.")
+        if st.session_state.mode != FIND_HELP:
+            st.button("📍 Find help near me", on_click=go_to_find_help, key="sidebar_find_help")
 
 
 def extract_urgency(text):
@@ -187,7 +211,65 @@ def whatsapp_link(text):
     return "https://wa.me/?text=" + quote(body)
 
 
-def render_message(role, text, image=None, share=False):
+# ---------------- NEARBY HELP ----------------
+
+def cached_nearby(lat, lon, radius_km):
+    # nearby_help.py remembers successful map searches for an hour, but not failures,
+    # so a busy map server is retried on the next visit.
+    return find_nearby_help(lat, lon, radius_km)
+
+
+def cached_geocode(place_text):
+    return geocode_place(place_text)
+
+
+def render_place(p, farmer):
+    """One card for a vet, agrovet or boda rider, with call / WhatsApp / directions / delivery buttons."""
+    badge = "✅ Verified" if p["verified"] else "🗺️ Map listing · call to confirm"
+    about = " · ".join(x for x in [p["type"], p.get("location", "")] if x)
+    dist = "less than 1 km away" if p["distance_km"] < 1 else f"about {p['distance_km']} km away"
+    if p.get("approx_location"):
+        dist += " (approximate)"
+
+    links = []
+    if p["phone"] and call_link(p["phone"]):
+        links.append(f"[📞 Call {p['phone']}]({call_link(p['phone'])})")
+    chat = whatsapp_chat_link(p["phone"], "Hello, I found you on Mesheco Poultry AI. I need help with my chickens.")
+    if chat:
+        links.append(f"[💬 WhatsApp]({chat})")
+    links.append(f"[🧭 Directions]({directions_link(p['lat'], p['lon'], farmer['lat'], farmer['lon'])})")
+    delivery = whatsapp_chat_link(p["phone"], delivery_message(farmer["lat"], farmer["lon"],
+                                                          st.session_state.delivery_items))
+    if delivery and (p["delivery"] or "agro" in p["type"].lower()):
+        label = "🛵 Book boda delivery" if p["type"].lower().startswith("boda") else "🛵 Ask for boda delivery"
+        links.append(f"[{label}]({delivery})")
+
+    with st.container(border=True):
+        st.markdown(f"**{p['name']}**  \n{badge}  \n{about} · {dist}")
+        st.markdown(" · ".join(links))
+        if not p["phone"]:
+            st.caption("No phone number listed. Use directions to visit.")
+
+
+def render_nearest_help(key):
+    """Shown under MEDIUM/HIGH replies: the nearest few places, or a button to share location."""
+    loc = st.session_state.location
+    if not loc:
+        st.info("📞 Need a vet or agrovet? Share your location to see the nearest ones.")
+        st.button("📍 Find help near me", on_click=go_to_find_help, key=f"find_help_{key}")
+        return
+    result = cached_nearby(loc["lat"], loc["lon"], 15)
+    places = [p for p in result["places"] if not p["type"].lower().startswith("boda")][:3]
+    if not places:
+        st.info("No vets or agrovets found within 15 km. Open **Find help near you** to search wider, "
+                "or contact your county veterinary office.")
+        return
+    st.markdown("**📞 Nearest help to you**")
+    for p in places:
+        render_place(p, loc)
+
+
+def render_message(role, text, image=None, share=False, key="new"):
     urgency, cleaned_text = extract_urgency(text)
 
     with st.chat_message(role):
@@ -204,7 +286,7 @@ def render_message(role, text, image=None, share=False):
         st.markdown(cleaned_text)
 
         if role == "assistant" and urgency in ("MEDIUM", "HIGH"):
-            st.info("📞 Need a vet? See **Find help near you** in the sidebar for local contacts.")
+            render_nearest_help(key)
 
         if share:
             st.markdown(f"[📤 Share on WhatsApp]({whatsapp_link(text)})")
@@ -352,7 +434,6 @@ def show_monitor_page():
                 st.session_state.monitor_result = run_monitor_agent(df.to_csv(index=False))
             except Exception as e:
                 print("ERROR DETAILS:", repr(e), flush=True)
-                st.exception(e)  # TEMPORARY: shows the real error on screen. Remove before the hackathon.
                 st.session_state.monitor_result = "Sorry, something went wrong while checking your flock. Please try again in a moment."
 
     if st.session_state.monitor_result:
@@ -375,11 +456,115 @@ if st.session_state.mode == "Monitor":
     st.stop()
 
 
+# ---------------- FIND HELP MODE ----------------
+
+def show_find_help_page():
+    st.subheader("📍 Find help near you")
+    st.caption("Agrovets, vets and boda boda riders near your farm, nearest first.")
+
+    # 1. Get the farmer's location: GPS from the phone, or a typed town
+    c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
+    with c1:
+        if st.button("📍 Use my current location", type="primary"):
+            st.session_state.gps_request += 1
+    with c2:
+        with st.form("place_search", clear_on_submit=False, border=False):
+            fc1, fc2 = st.columns([3, 1], vertical_alignment="bottom")
+            typed = fc1.text_input("Or type your town or village", placeholder="e.g. Gatundu, Thika, Kitengela")
+            searched = fc2.form_submit_button("Search")
+    if searched and typed.strip():
+        with st.spinner("Finding that place..."):
+            try:
+                found = cached_geocode(typed.strip())
+            except Exception:
+                found = False
+                st.error("Could not reach the map service. Please try again in a moment.")
+        if found:
+            st.session_state.location = found
+            st.session_state.gps_request = 0
+        elif found is None:
+            st.warning("We couldn't find that place. Try a nearby town or add the county, e.g. 'Gatundu, Kiambu'.")
+
+    if st.session_state.gps_request:
+        geo = get_geolocation(component_key=f"gps_{st.session_state.gps_request}")
+        if geo is None:
+            st.caption("⏳ Waiting for your phone or browser. If it asks, tap **Allow** to share your location.")
+        elif "error" in geo:
+            st.session_state.gps_request = 0
+            st.warning("Location was blocked or not available. You can type your town instead.")
+        else:
+            coords = geo["coords"]
+            st.session_state.location = {
+                "lat": coords["latitude"],
+                "lon": coords["longitude"],
+                "label": f"Your current location (within about {int(coords.get('accuracy') or 0)} m)",
+            }
+            st.session_state.gps_request = 0
+            st.rerun()
+
+    loc = st.session_state.location
+    if not loc:
+        st.info("Share your location or type your town to see help near you.")
+        return
+    st.success(f"Showing help near: **{loc['label']}**")
+
+    # 2. Options
+    o1, o2 = st.columns(2)
+    radius = o1.select_slider("Search distance (km)", options=[5, 10, 15, 25, 40], value=15)
+    show = o2.radio("Show", ["Everything", "Agrovets & vets", "Boda delivery"], horizontal=True)
+    st.session_state.delivery_items = st.text_input(
+        "What do you need delivered? (optional, added to delivery messages)",
+        value=st.session_state.delivery_items,
+        placeholder="e.g. 1 bag of layers mash, vitamins, a drinker",
+    )
+
+    # 3. Search
+    with st.spinner("Looking for help near you..."):
+        result = cached_nearby(loc["lat"], loc["lon"], radius)
+    if result["map_error"]:
+        st.warning(result["map_error"])
+
+    places = result["places"]
+    if show == "Agrovets & vets":
+        places = [p for p in places if not p["type"].lower().startswith("boda")]
+    elif show == "Boda delivery":
+        places = [p for p in places if p["delivery"]]
+
+    if not places:
+        if show == "Boda delivery":
+            st.info("No verified boda riders listed here yet. Tap **🛵 Ask for boda delivery** on an "
+                    "agrovet card: many agrovets can send supplies with a boda rider they trust.")
+        else:
+            st.info("Nothing found within this distance. Try a bigger search distance, "
+                    "or contact your county veterinary office.")
+        return
+
+    # 4. Map: you (green) and the places (orange = verified, blue = map listing)
+    map_rows = [{"lat": loc["lat"], "lon": loc["lon"], "color": "#2e7d32", "size": 120}]
+    for p in places:
+        map_rows.append({"lat": p["lat"], "lon": p["lon"],
+                         "color": "#ef6c00" if p["verified"] else "#1e88e5", "size": 80})
+    st.map(pd.DataFrame(map_rows), latitude="lat", longitude="lon", color="color", size="size")
+    st.caption("🟢 You · 🟠 Verified by Mesheco · 🔵 Map listing (OpenStreetMap, may be out of date)")
+
+    # 5. Cards
+    st.markdown(f"**{len(places)} found, nearest first**")
+    for p in places[:20]:
+        render_place(p, loc)
+    st.caption("Distances are straight-line, so the road trip may be longer. "
+               "Always confirm prices and stock before a boda rider sets off.")
+
+
+if st.session_state.mode == FIND_HELP:
+    show_find_help_page()
+    st.stop()
+
+
 # ---------------- DIAGNOSE & RESEARCH MODES ----------------
 
-for msg in st.session_state.display_messages:
+for i, msg in enumerate(st.session_state.display_messages):
     is_shareable = msg["role"] == "assistant" and not msg.get("error")
-    render_message(msg["role"], msg["content"], msg.get("image"), share=is_shareable)
+    render_message(msg["role"], msg["content"], msg.get("image"), share=is_shareable, key=i)
 
 placeholder_text = "Describe your birds' symptoms..." if st.session_state.mode == "Diagnose" else "Ask about current outbreaks or poultry news..."
 user_input = st.chat_input(placeholder_text)
@@ -402,14 +587,14 @@ if user_input:
         try:
             if st.session_state.mode == "Diagnose":
                 reply, st.session_state.history = run_agent(
-                    user_input, st.session_state.history, image_bytes=image_bytes
+                    user_input, st.session_state.history, image_bytes=image_bytes,
+                    location=st.session_state.location
                 )
             else:
                 reply = run_research_agent(user_input)
         except Exception as e:
             had_error = True
             print("ERROR DETAILS:", repr(e), flush=True)
-            st.exception(e)  # TEMPORARY: shows the real error on screen. Remove before the hackathon.
             reply = "Sorry, something went wrong while processing your message. Please try again in a moment."
 
     render_message("assistant", reply, share=not had_error)

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from anthropic import Anthropic
 from PIL import Image, ImageOps
 from kb_search import search_disease_kb
+from nearby_help import summarise_for_agent
 
 load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -27,6 +28,19 @@ tools = [
                 }
             },
             "required": ["symptoms_text"]
+        }
+    },
+    {
+        "name": "find_nearby_help",
+        "description": "Find vets, agrovets and boda boda delivery riders near the farmer's shared location, nearest first. Call this when you recommend contacting a vet or agrovet, or when the farmer asks where to get help or supplies. It needs no input: it uses the location the farmer shared in the app.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "radius_km": {
+                    "type": "number",
+                    "description": "How far to search, in km. Default 15. Use 30 or more for remote rural areas."
+                }
+            }
         }
     }
 ]
@@ -53,7 +67,10 @@ Be concise, practical, and clear. Avoid jargon. Assume the farmer is not a vet.
 
 TALK ABOUT THE BIRDS, NOT THE APP: Never mention the knowledge base, the search tool, "the results", or how you found information. Speak only about the birds and what the farmer should do.
 
-CONTACTS: Never invent phone numbers, hotlines, websites or organisation names. When you advise contacting a vet, agrovet or the county veterinary office, add that the farmer can find local contacts in the "Find help near you" section of this app's sidebar.
+CONTACTS: Never invent phone numbers, hotlines, websites or organisation names. When you advise contacting a vet or agrovet, call the find_nearby_help tool.
+- If it returns places, name the nearest one to three by name, type and distance (e.g. "Kamau Agrovet, about 3 km away"). Say whether each is verified. For unverified ones, say to call or visit first to confirm. If one offers delivery, mention the farmer can ask for supplies to be delivered by boda boda.
+- Do not write out phone numbers or links; say they appear below your reply with buttons to call, WhatsApp or get directions.
+- If the tool says the location is not shared, or returns no places, tell the farmer they can share their location or type their town on the "Find help near you" page of this app, and suggest the county veterinary office.
 
 CLARIFYING QUESTIONS: If your reply ONLY asks clarifying questions and gives no assessment or advice, you may leave out the urgency tag and the full disclaimer, but end with one short line: "If birds are dying quickly or many are sick, contact a vet or livestock officer now rather than waiting." Whenever you give any assessment, possible causes or advice, the urgency tag and full disclaimer are required.
 
@@ -103,7 +120,23 @@ def _get_text(content_blocks):
     return "\n".join(parts).strip()
 
 
-def run_agent(user_message, conversation_history=None, image_bytes=None):
+def _run_nearby_tool(tool_input, location):
+    """Run the find_nearby_help tool using the location the farmer shared in the app."""
+    if not location:
+        return {"location_shared": False,
+                "note": "The farmer has not shared a location yet."}
+    radius = tool_input.get("radius_km") or 15
+    try:
+        radius = max(2, min(float(radius), 60))
+    except (TypeError, ValueError):
+        radius = 15
+    result = summarise_for_agent(location["lat"], location["lon"], radius_km=radius)
+    result["location_shared"] = True
+    result["farmer_area"] = location.get("label", "")
+    return result
+
+
+def run_agent(user_message, conversation_history=None, image_bytes=None, location=None):
     # Work on a COPY of the history. If anything fails, the saved history
     # stays clean, so the next message still works.
     history = list(conversation_history or [])
@@ -146,6 +179,13 @@ def run_agent(user_message, conversation_history=None, image_bytes=None):
             if block.type == "tool_use":
                 if block.name == "search_disease_kb":
                     result = search_disease_kb(block.input["symptoms_text"])
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result, default=str)
+                    })
+                elif block.name == "find_nearby_help":
+                    result = _run_nearby_tool(block.input, location)
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,

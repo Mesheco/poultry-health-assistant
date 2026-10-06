@@ -1,6 +1,7 @@
-   streamlit
-   anthropic
-   python-dotenv
-   requests
-   pillow
-   pandas
+streamlit
+anthropic
+python-dotenv
+requests
+pillow
+pandas
+streamlit-js-eval

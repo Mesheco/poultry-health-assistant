@@ -165,3 +165,61 @@ This tool is for informational purposes only and does not replace professional v
 ---
 
 *Built as a hackathon submission demonstrating a real-world, deployable use case for multi-agent AI in an underserved sector.*
+
+
+---
+
+## 📍 Find help near you: agrovets, vets and boda delivery
+
+Diagnosis is only useful if the farmer can act on it. The **Find help near you** page:
+
+- gets the farmer's location from their phone's GPS (one tap) or a typed town/village
+- shows nearby **agrovets, vet clinics and boda boda riders** on a map, nearest first
+- gives one-tap buttons to **📞 Call**, **💬 WhatsApp**, **🧭 Get directions**, and **🛵 Ask for boda delivery**, which sends a ready-made WhatsApp message with what the farmer needs and a map pin of their farm
+
+The **Diagnose agent** also has a `find_nearby_help` tool. When it recommends a vet or agrovet, it looks up the nearest ones and names them, and the app shows their contact cards under any MEDIUM or HIGH urgency reply.
+
+**Two sources, kept clearly apart:**
+- ✅ **Verified** contacts from `vet_contacts.json`, checked by the Mesheco team
+- 🗺️ **Map listings** from OpenStreetMap (free, no API key), labelled "call to confirm"
+
+The agent is told never to invent names or numbers; it can only use what the tool returns.
+
+### Adding verified contacts
+
+Add entries to `vet_contacts.json`. `lat`/`lon` are optional (if missing, the app looks up the `location` text, and marks the distance as approximate). Set `"delivery": true` for anyone who delivers. Use type `"Boda rider"` for delivery riders.
+
+```json
+{
+  "county": "Kiambu",
+  "type": "Agrovet",
+  "name": "Name of the agrovet",
+  "location": "Town, County",
+  "phone": "07XX XXX XXX",
+  "lat": -1.0,
+  "lon": 36.9,
+  "delivery": true
+}
+```
+
+Only add people who have agreed to be listed.
+
+---
+
+## 🌱 AgriNexus: the farmer's front door, powered by Mesheco
+
+`agrinexus/index.html` is AgriNexus, a smart-farmers app prototype (marketplace, M-Pesa, analytics, deliveries). Mesheco is its AI engine:
+
+| AgriNexus screen | What Mesheco powers |
+|---|---|
+| **AI Chat** | The live Mesheco app is embedded: Diagnose, Research, Monitor and Find help |
+| **Map** | *Live help near you*: GPS or typed town → real agrovets, vets and boda riders on a map, with call, WhatsApp, directions and boda delivery requests |
+| **Vets** | *Vets near me* and *Diagnose with Mesheco first* |
+| **Delivery** | *Request boda delivery* from a nearby agrovet, with the farm's map pin |
+
+Both apps read the same verified list (`vet_contacts.json` in this repo), so a contact added once shows up in both. Other AgriNexus figures (flock numbers, orders, payments) are still sample data and are labelled as such.
+
+**Opening Mesheco on a specific page.** Any link can use these options:
+`?mode=diagnose|research|monitor|find-help`, `&q=question for the Diagnose agent`, `&lat=…&lon=…` (the farmer's location).
+
+**Hosting AgriNexus.** In the repo's GitHub **Settings → Pages**, choose *Deploy from a branch*, branch `main`, folder `/ (root)`. AgriNexus will then be at `https://mesheco.github.io/poultry-health-assistant/agrinexus/`. A secure (https) address like this is needed for the phone's GPS to work.
